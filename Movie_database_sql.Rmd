@@ -1,0 +1,117 @@
+---
+title: "SQL and R"
+author: "Nataliya Ferdinand"
+date: "2024-09-08"
+output: html_document
+---
+
+# Introduction
+
+For this project, I selected six popular movies and asked five individuals from my social circle, including friends and family, to rate each movie they had seen on a scale from 1 to 5. I gathered these ratings and observations and stored them in a structured SQL database. To facilitate analysis and further exploration, I then connected to the SQL database and loaded the movie rating data into an R data frame for processing. This workflow highlights my ability to work with relational databases, SQL queries, and data manipulation in R. 
+
+#### **Setting a CRAN mirror before installing the package "DBI"**
+
+When I am trying to install the DBI package in my RMarkdown file, R is attempting to connect to CRAN without specifying which mirror (server) to use. Thus, I need to set a CRAN mirror before installing the package "DBI"
+
+```{r}
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+```
+##### **Installing packages **
+
+I installed "DBI" package that provides an easy way to connect with SQL databases, allowing to obtain, modify, and analyze data in real-time.
+Also, I installed "RMySQL" package since I am using MySQL. 
+
+```{r}
+install.packages("DBI")
+install.packages("RMySQL")
+```
+
+#### **Establishing Database Connection**
+
+I need to establish a connection to my SQL database (MySQL) before running queries. 
+
+```{r}
+library(DBI)
+movie_database<-dbConnect(RMySQL::MySQL(),
+               dbname="movie",
+               host ="localhost", #or my SQL server address
+               port = 3306,
+               user = "root",
+               password="Matrix%607")
+
+#check if connection is successful
+dbListTables(movie_database)
+```
+```{r}
+movies_table<-dbGetQuery(movie_database, "select * from movies")
+movies_table
+```
+#### **Checking all columns of all three tables: users, movies, and users_movies **
+
+I created three tables and I want to see all the columns and the data in each column. 
+
+```{r}
+users_table<-dbGetQuery(movie_database, "select * from users")
+users_table
+```
+
+```{r}
+users_movies_table<-dbGetQuery(movie_database, "select * from users_movies")
+users_movies_table
+```
+
+#### **The SQL query to join the tables**
+
+Since the columns of interest locates in different columns, I need to join them. The columns which I want to get are userid  and username from "Users" table; movieid and title are from "movies" table; and rating column is from "users_movies" table. 
+
+```{r}
+query1<-"select u.userid, u.username, t.movieid, t.title, r.rating 
+       from movies t JOIN users_movies r 
+       ON t.movieid=r.movieid
+       JOIN users u ON u.userid=r.userid"
+result1<-dbGetQuery(movie_database, query1)
+result1
+```
+
+#### **Installing "dplyr" package**
+
+I need "dplyr" package for making data manipulation easier. For example, I filter only those observations (rows) that do not have missing data (NA).
+
+```{r}
+library(dplyr)
+result_clean<-result1%>%filter(!is.na(rating))
+result_clean
+```
+
+#### **Calculation of average rating per movie**
+
+In order to create a graph that will show an average rating for each movie, I used summarize(), mean() group_by() functions. 
+
+```{r}
+# Calculate average rating per movie
+avg_rating_per_movie <- result_clean %>%
+  group_by(title) %>%
+  summarise(avg_rating = mean(rating))
+avg_rating_per_movie
+```
+
+#### **Creation of a bar plot of average ratings** 
+
+```{r}
+# Create a bar plot of average ratings
+library(ggplot2)
+ggplot(avg_rating_per_movie, aes(x = title, y = avg_rating)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Average Rating per Movie", x = "Movie Title", y = "Average Rating")
+```
+
+```{r}
+dbDisconnect(movie_database)
+```
+
+
+
+# Conclusion: 
+
+After analyzing the ratings from all five participants, the movie *Game of Thrones* emerged as the highest-rated, consistently receiving strong feedback. Based on the ratings provided, it secured the top spot with the highest average score, demonstrating its popularity and appeal among the group of respondents. 
